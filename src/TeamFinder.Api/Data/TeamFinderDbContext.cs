@@ -22,6 +22,11 @@ public sealed class TeamFinderDbContext(DbContextOptions<TeamFinderDbContext> op
     // Also used by the EF Core model snapshot so future migrations compare against this model.
     public static void ConfigureModel(ModelBuilder modelBuilder)
     {
+        // Явно фиксируем аннотацию провайдера, используемую в EF Core model snapshot.
+        modelBuilder.HasAnnotation(
+            "Npgsql:ValueGenerationStrategy",
+            Npgsql.EntityFrameworkCore.PostgreSQL.Metadata.NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
+
         modelBuilder.Entity<User>(e =>
         {
             e.ToTable("users");
