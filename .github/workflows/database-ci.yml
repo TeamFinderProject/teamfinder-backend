@@ -1,0 +1,58 @@
+name: Проверка базы данных
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, "feature/**"]
+
+jobs:
+  build-and-migrate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: teamfinder
+          POSTGRES_USER: teamfinder
+          POSTGRES_PASSWORD: teamfinder_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U teamfinder -d teamfinder"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      ConnectionStrings__TeamFinder: Host=localhost;Port=5432;Database=teamfinder;Username=teamfinder;Password=teamfinder_ci
+
+    steps:
+      - name: Получить исходный код
+        uses: actions/checkout@v4
+
+      - name: Установить .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Восстановить зависимости
+        run: dotnet restore TeamFinder.Api/TeamFinder.Api.csproj
+
+      - name: Собрать проект
+        run: dotnet build TeamFinder.Api/TeamFinder.Api.csproj --configuration Release --no-restore
+
+      - name: Установить EF Core CLI
+        run: dotnet tool install --global dotnet-ef --version 8.0.11
+
+      - name: Применить миграции к пустой базе
+        run: dotnet ef database update --project TeamFinder.Api/TeamFinder.Api.csproj --startup-project TeamFinder.Api/TeamFinder.Api.csproj
+
+      - name: Проверить таблицы и справочники
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+          test "$(psql "$ConnectionStrings__TeamFinder" -tAc 'SELECT COUNT(*) FROM skills')" -eq 18
+          test "$(psql "$ConnectionStrings__TeamFinder" -tAc 'SELECT COUNT(*) FROM role_types')" -eq 8
+          test "$(psql "$ConnectionStrings__TeamFinder" -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name IN ('users','profiles','skills','role_types','user_skills','user_role_interests','projects','project_roles','role_skill_requirements','applications','memberships')")" -eq 11
+          echo "Создание схемы и заполнение справочников проверены."
