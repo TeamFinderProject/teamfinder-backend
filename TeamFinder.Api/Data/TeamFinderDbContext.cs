@@ -45,15 +45,15 @@ public sealed class TeamFinderDbContext(DbContextOptions<TeamFinderDbContext> op
             e.ToTable("skills"); e.HasKey(x => x.Id); e.Property(x => x.Id).UseIdentityByDefaultColumn();
             e.Property(x => x.Name).HasMaxLength(100).IsRequired(); e.HasIndex(x => x.Name).IsUnique();
             e.HasData(
-                new Skill { Id=1, Name="C#" }, new Skill { Id=2, Name="ASP.NET Core" },
-                new Skill { Id=3, Name="PostgreSQL" }, new Skill { Id=4, Name="Entity Framework Core" },
-                new Skill { Id=5, Name="JavaScript" }, new Skill { Id=6, Name="TypeScript" },
-                new Skill { Id=7, Name="React" }, new Skill { Id=8, Name="HTML/CSS" },
-                new Skill { Id=9, Name="Docker" }, new Skill { Id=10, Name="Git" },
-                new Skill { Id=11, Name="Go" }, new Skill { Id=12, Name="Redis" },
-                new Skill { Id=13, Name="Figma" }, new Skill { Id=14, Name="Python" },
-                new Skill { Id=15, Name="REST API" }, new Skill { Id=16, Name="SQL" },
-                new Skill { Id=17, Name="Тестирование ПО" }, new Skill { Id=18, Name="UI/UX" }
+                new Skill { Id=1, Name="C#", Description="Язык программирования" }, new Skill { Id=2, Name="ASP.NET Core", Description="Платформа разработки серверных приложений" },
+                new Skill { Id=3, Name="PostgreSQL", Description="Реляционная база данных" }, new Skill { Id=4, Name="Entity Framework Core", Description="ORM для .NET" },
+                new Skill { Id=5, Name="JavaScript", Description="Язык программирования" }, new Skill { Id=6, Name="TypeScript", Description="Типизированный JavaScript" },
+                new Skill { Id=7, Name="React", Description="Библиотека пользовательских интерфейсов" }, new Skill { Id=8, Name="HTML/CSS", Description="Разметка и стилизация веб-страниц" },
+                new Skill { Id=9, Name="Docker", Description="Контейнеризация приложений" }, new Skill { Id=10, Name="Git", Description="Контроль версий" },
+                new Skill { Id=11, Name="Go", Description="Язык программирования" }, new Skill { Id=12, Name="Redis", Description="Хранилище данных в памяти" },
+                new Skill { Id=13, Name="Figma", Description="Инструмент проектирования интерфейсов" }, new Skill { Id=14, Name="Python", Description="Язык программирования" },
+                new Skill { Id=15, Name="REST API", Description="Проектирование и разработка API" }, new Skill { Id=16, Name="SQL", Description="Язык запросов к реляционным БД" },
+                new Skill { Id=17, Name="Тестирование ПО", Description="Проверка качества программного обеспечения" }, new Skill { Id=18, Name="UI/UX", Description="Проектирование пользовательского опыта" }
             );
         });
         modelBuilder.Entity<RoleType>(e =>
@@ -61,10 +61,10 @@ public sealed class TeamFinderDbContext(DbContextOptions<TeamFinderDbContext> op
             e.ToTable("role_types"); e.HasKey(x => x.Id); e.Property(x => x.Id).UseIdentityByDefaultColumn();
             e.Property(x => x.Name).HasMaxLength(100).IsRequired(); e.HasIndex(x => x.Name).IsUnique();
             e.HasData(
-                new RoleType { Id=1, Name="Backend Developer" }, new RoleType { Id=2, Name="Frontend Developer" },
-                new RoleType { Id=3, Name="Fullstack Developer" }, new RoleType { Id=4, Name="Designer" },
-                new RoleType { Id=5, Name="DevOps Engineer" }, new RoleType { Id=6, Name="QA Engineer" },
-                new RoleType { Id=7, Name="Product Manager" }, new RoleType { Id=8, Name="Data Analyst" }
+                new RoleType { Id=1, Name="Backend Developer", Description="Разработчик серверной части" }, new RoleType { Id=2, Name="Frontend Developer", Description="Разработчик пользовательского интерфейса" },
+                new RoleType { Id=3, Name="Fullstack Developer", Description="Разработчик серверной и клиентской частей" }, new RoleType { Id=4, Name="Designer", Description="Дизайнер" },
+                new RoleType { Id=5, Name="DevOps Engineer", Description="Инженер инфраструктуры и развёртывания" }, new RoleType { Id=6, Name="QA Engineer", Description="Инженер по тестированию" },
+                new RoleType { Id=7, Name="Product Manager", Description="Менеджер продукта" }, new RoleType { Id=8, Name="Data Analyst", Description="Аналитик данных" }
             );
         });
         modelBuilder.Entity<UserSkill>(e =>
