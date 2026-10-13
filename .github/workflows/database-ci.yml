@@ -52,7 +52,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
-          test "$(psql "$ConnectionStrings__TeamFinder" -tAc 'SELECT COUNT(*) FROM skills')" -eq 18
-          test "$(psql "$ConnectionStrings__TeamFinder" -tAc 'SELECT COUNT(*) FROM role_types')" -eq 8
-          test "$(psql "$ConnectionStrings__TeamFinder" -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name IN ('users','profiles','skills','role_types','user_skills','user_role_interests','projects','project_roles','role_skill_requirements','applications','memberships')")" -eq 11
+          export PGHOST=localhost PGPORT=5432 PGDATABASE=teamfinder PGUSER=teamfinder PGPASSWORD=teamfinder_ci
+          test "$(psql -tAc 'SELECT COUNT(*) FROM skills')" -eq 18
+          test "$(psql -tAc 'SELECT COUNT(*) FROM role_types')" -eq 8
+          test "$(psql -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name IN ('users','profiles','skills','role_types','user_skills','user_role_interests','projects','project_roles','role_skill_requirements','applications','memberships')")" -eq 11
           echo "Создание схемы и заполнение справочников проверены."
