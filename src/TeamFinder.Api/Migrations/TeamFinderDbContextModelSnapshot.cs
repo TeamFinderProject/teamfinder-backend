@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TeamFinder.Api.Data;
 
 #nullable disable
@@ -14,7 +15,8 @@ public sealed class TeamFinderDbContextModelSnapshot : ModelSnapshot
     {
         modelBuilder
             .HasAnnotation("ProductVersion", "10.0.12")
-            .HasAnnotation("Relational:MaxIdentifierLength", 63);
+            .HasAnnotation("Relational:MaxIdentifierLength", 63)
+            .HasAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
 
         InitialTeamFinderModel.ConfigureModel(modelBuilder);
     }
