@@ -115,6 +115,18 @@ public sealed class InitialTeamFinderSchema : Migration
             );
             CREATE UNIQUE INDEX "IX_memberships_UserId_ProjectId" ON memberships ("UserId", "ProjectId");
 
+            -- Индексы для внешних ключей, соответствующие соглашениям EF Core.
+            CREATE INDEX "IX_user_skills_SkillId" ON user_skills ("SkillId");
+            CREATE INDEX "IX_user_role_interests_RoleTypeId" ON user_role_interests ("RoleTypeId");
+            CREATE INDEX "IX_projects_OwnerId" ON projects ("OwnerId");
+            CREATE INDEX "IX_project_roles_ProjectId" ON project_roles ("ProjectId");
+            CREATE INDEX "IX_project_roles_RoleTypeId" ON project_roles ("RoleTypeId");
+            CREATE INDEX "IX_role_skill_requirements_SkillId" ON role_skill_requirements ("SkillId");
+            CREATE INDEX "IX_applications_ProjectId" ON applications ("ProjectId");
+            CREATE INDEX "IX_applications_ProjectRoleId_ProjectId" ON applications ("ProjectRoleId", "ProjectId");
+            CREATE INDEX "IX_memberships_ProjectId" ON memberships ("ProjectId");
+            CREATE INDEX "IX_memberships_ProjectRoleId_ProjectId" ON memberships ("ProjectRoleId", "ProjectId");
+
             INSERT INTO skills ("Id", "Name", "Description") VALUES
               (1,'C#','Язык программирования'),
               (2,'ASP.NET Core','Платформа разработки серверных приложений'),
