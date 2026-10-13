@@ -168,7 +168,7 @@ public sealed class InitialTeamFinderSchema : Migration
             .HasAnnotation("ProductVersion", "8.0.11")
             .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-        TeamFinderDbContext.ConfigureModel(modelBuilder);
+        InitialTeamFinderModel.ConfigureModel(modelBuilder);
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
