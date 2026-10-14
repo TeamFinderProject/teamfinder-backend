@@ -65,6 +65,7 @@ internal static class InitialTeamFinderModel
                 e.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
                 e.HasOne(x => x.User).WithMany(x => x.Skills).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.Skill).WithMany(x => x.Users).HasForeignKey(x => x.SkillId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => x.SkillId);
             });
             modelBuilder.Entity<UserRoleInterest>(e =>
             {
@@ -72,6 +73,7 @@ internal static class InitialTeamFinderModel
                 e.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
                 e.HasOne(x => x.User).WithMany(x => x.RoleInterests).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.RoleType).WithMany(x => x.InterestedUsers).HasForeignKey(x => x.RoleTypeId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => x.RoleTypeId);
             });
             modelBuilder.Entity<Project>(e =>
             {
@@ -81,6 +83,7 @@ internal static class InitialTeamFinderModel
                 e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
                 e.Property(x => x.CreatedAt).HasDefaultValueSql("now()"); e.Property(x => x.UpdatedAt).HasDefaultValueSql("now()");
                 e.HasOne(x => x.Owner).WithMany(x => x.OwnedProjects).HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => x.OwnerId);
             });
             modelBuilder.Entity<ProjectRole>(e =>
             {
@@ -90,6 +93,8 @@ internal static class InitialTeamFinderModel
                 e.HasAlternateKey(x => new { x.Id, x.ProjectId });
                 e.HasOne(x => x.Project).WithMany(x => x.Roles).HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.RoleType).WithMany(x => x.ProjectRoles).HasForeignKey(x => x.RoleTypeId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => x.ProjectId);
+                e.HasIndex(x => x.RoleTypeId);
             });
             modelBuilder.Entity<RoleSkillRequirement>(e =>
             {
@@ -103,6 +108,7 @@ internal static class InitialTeamFinderModel
                 e.Property(x => x.MinimumLevel).HasConversion<string>().HasMaxLength(20);
                 e.HasOne(x => x.ProjectRole).WithMany(x => x.SkillRequirements).HasForeignKey(x => x.ProjectRoleId).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.Skill).WithMany(x => x.RoleRequirements).HasForeignKey(x => x.SkillId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => x.SkillId);
             });
             modelBuilder.Entity<Application>(e =>
             {
@@ -122,6 +128,8 @@ internal static class InitialTeamFinderModel
                 e.HasOne(x => x.User).WithMany(x => x.Applications).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.Project).WithMany(x => x.Applications).HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.ProjectRole).WithMany(x => x.Applications).HasForeignKey(x => new { x.ProjectRoleId, x.ProjectId }).HasPrincipalKey(x => new { x.Id, x.ProjectId }).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => x.ProjectId);
+                e.HasIndex(x => new { x.ProjectRoleId, x.ProjectId });
             });
             modelBuilder.Entity<Membership>(e =>
             {
@@ -131,6 +139,8 @@ internal static class InitialTeamFinderModel
                 e.HasOne(x => x.User).WithMany(x => x.Memberships).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.Project).WithMany(x => x.Memberships).HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.ProjectRole).WithMany(x => x.Memberships).HasForeignKey(x => new { x.ProjectRoleId, x.ProjectId }).HasPrincipalKey(x => new { x.Id, x.ProjectId }).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => x.ProjectId);
+                e.HasIndex(x => new { x.ProjectRoleId, x.ProjectId });
             });
         }
 }
