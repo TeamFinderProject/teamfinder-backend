@@ -54,3 +54,8 @@ jobs:
         run: psql -tAc "SELECT COUNT(*) FROM role_types" | grep -qx 8
       - name: Проверить таблицы модели
         run: psql -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name IN ('users','profiles','skills','role_types','user_skills','user_role_interests','projects','project_roles','role_skill_requirements','applications','memberships')" | grep -qx 11
+      - name: Проверить поля и ограничения ERD
+        run: |
+          test "$(psql -tAc "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'projects' AND column_name = 'ProjectType'")" -eq 1
+          test "$(psql -tAc "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'memberships' AND column_name IN ('EndedAt','EndReason')")" -eq 2
+          test "$(psql -tAc "SELECT COUNT(*) FROM pg_constraint WHERE conname IN ('CK_projects_project_type','CK_memberships_end_reason','CK_memberships_end_state')")" -eq 3
