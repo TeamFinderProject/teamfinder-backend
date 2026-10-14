@@ -52,3 +52,5 @@ jobs:
         run: psql -tAc "SELECT COUNT(*) FROM skills" | grep -qx 18
       - name: Проверить справочник типов ролей
         run: psql -tAc "SELECT COUNT(*) FROM role_types" | grep -qx 8
+      - name: Проверить таблицы модели
+        run: psql -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name IN ('users','profiles','skills','role_types','user_skills','user_role_interests','projects','project_roles','role_skill_requirements','applications','memberships')" | grep -qx 11
