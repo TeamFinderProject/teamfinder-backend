@@ -166,7 +166,10 @@ public sealed class InitialTeamFinderSchema : Migration
     {
         modelBuilder
             .HasAnnotation("ProductVersion", "10.0.12")
-            .HasAnnotation("Relational:MaxIdentifierLength", 63);
+            .HasAnnotation("Relational:MaxIdentifierLength", 63)
+            .HasAnnotation(
+                "Npgsql:ValueGenerationStrategy",
+                Npgsql.EntityFrameworkCore.PostgreSQL.Metadata.NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
 
         InitialTeamFinderModel.ConfigureModel(modelBuilder);
     }
