@@ -2,12 +2,12 @@ name: Проверка базы данных
 
 on:
   pull_request:
-    branches: [main, "feature/backend-skeleton"]
+    branches: [main]
   push:
-    branches: [main, "feature/**"]
+    branches: [main, "migration/**"]
 
 jobs:
-  build-and-migrate:
+  build-and-upgrade-database:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -25,27 +25,86 @@ jobs:
           --health-retries 10
     env:
       ConnectionStrings__TeamFinder: Host=localhost;Port=5432;Database=teamfinder;Username=teamfinder;Password=teamfinder_ci
+      PGHOST: localhost
+      PGPORT: 5432
+      PGDATABASE: teamfinder
+      PGUSER: teamfinder
+      PGPASSWORD: teamfinder_ci
     steps:
       - name: Получить исходный код
         uses: actions/checkout@v4
+
       - name: Установить .NET SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+
       - name: Восстановить зависимости
         run: dotnet restore src/TeamFinder.Api/TeamFinder.Api.csproj
+
       - name: Собрать проект
         run: dotnet build src/TeamFinder.Api/TeamFinder.Api.csproj --configuration Release --no-restore
+
       - name: Установить EF Core CLI
         run: dotnet tool install --global dotnet-ef --version 10.0.12
-      - name: Применить миграции к пустой базе
-        run: dotnet ef database update --project src/TeamFinder.Api/TeamFinder.Api.csproj --startup-project src/TeamFinder.Api/TeamFinder.Api.csproj
-      - name: Проверить таблицы и справочники
+
+      - name: Применить только исходную схему v1
+        run: dotnet ef database update 202610140001_InitialTeamFinderSchema --project src/TeamFinder.Api/TeamFinder.Api.csproj --startup-project src/TeamFinder.Api/TeamFinder.Api.csproj
+
+      - name: Установить клиент PostgreSQL
         run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
-          export PGHOST=localhost PGPORT=5432 PGDATABASE=teamfinder PGUSER=teamfinder PGPASSWORD=teamfinder_ci
+
+      - name: Подготовить тестовые данные предыдущей схемы
+        run: |
+          psql <<'SQL'
+          DO $$
+          DECLARE
+              owner_id bigint;
+              project_id bigint;
+              role_id bigint;
+              skill_id bigint;
+              role_type_id bigint;
+          BEGIN
+              INSERT INTO users ("Email", "PasswordHash")
+              VALUES ('migration-v1-owner@test.invalid', 'ci-placeholder')
+              RETURNING "Id" INTO owner_id;
+
+              INSERT INTO projects ("OwnerId", "Title", "Description", "Status")
+              VALUES (owner_id, 'Legacy v1 project', 'Migration test fixture', 'Draft')
+              RETURNING "Id" INTO project_id;
+
+              SELECT "Id" INTO skill_id FROM skills WHERE "Name" = 'C#';
+              SELECT "Id" INTO role_type_id FROM role_types WHERE "Name" = 'Backend Developer';
+
+              INSERT INTO user_skills ("UserId", "SkillId", "Level")
+              VALUES (owner_id, skill_id, 'Expert');
+
+              INSERT INTO project_roles ("ProjectId", "RoleTypeId", "Title", "Capacity")
+              VALUES (project_id, role_type_id, 'Legacy v1 role', 1)
+              RETURNING "Id" INTO role_id;
+
+              INSERT INTO role_skill_requirements ("ProjectRoleId", "SkillId", "RequirementType", "MinimumLevel")
+              VALUES (role_id, skill_id, 'Required', 'Expert');
+          END $$;
+          SQL
+
+      - name: Применить новую миграцию к существующей схеме
+        run: dotnet ef database update --project src/TeamFinder.Api/TeamFinder.Api.csproj --startup-project src/TeamFinder.Api/TeamFinder.Api.csproj
+
+      - name: Проверить таблицы и справочники
+        run: |
           test "$(psql -tAc 'SELECT COUNT(*) FROM skills')" -eq 18
           test "$(psql -tAc 'SELECT COUNT(*) FROM role_types')" -eq 8
           test "$(psql -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name IN ('users','profiles','skills','role_types','user_skills','user_role_interests','projects','project_roles','role_skill_requirements','applications','memberships')")" -eq 11
-          echo "Создание схемы и заполнение справочников проверены."
+
+      - name: Проверить сохранение и преобразование существующих данных
+        run: |
+          test "$(psql -tAc "SELECT COUNT(*) FROM projects p JOIN users u ON u.\"Id\" = p.\"OwnerId\" WHERE u.\"Email\" = 'migration-v1-owner@test.invalid' AND p.\"Title\" = 'Legacy v1 project' AND p.\"ProjectType\" = 'PetProject'")" -eq 1
+          test "$(psql -tAc "SELECT COUNT(*) FROM user_skills us JOIN users u ON u.\"Id\" = us.\"UserId\" WHERE u.\"Email\" = 'migration-v1-owner@test.invalid' AND us.\"Level\" = 'Advanced'")" -eq 1
+          test "$(psql -tAc "SELECT COUNT(*) FROM role_skill_requirements rsr JOIN project_roles pr ON pr.\"Id\" = rsr.\"ProjectRoleId\" JOIN projects p ON p.\"Id\" = pr.\"ProjectId\" JOIN users u ON u.\"Id\" = p.\"OwnerId\" WHERE u.\"Email\" = 'migration-v1-owner@test.invalid' AND rsr.\"MinimumLevel\" = 'Advanced'")" -eq 1
+          test "$(psql -tAc "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'projects' AND column_name = 'ProjectType'")" -eq 1
+          test "$(psql -tAc "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'memberships' AND column_name IN ('EndedAt','EndReason')")" -eq 2
+          test "$(psql -tAc "SELECT COUNT(*) FROM pg_constraint WHERE conname IN ('CK_projects_project_type','CK_memberships_end_reason','CK_memberships_end_state','CK_user_skills_level','CK_role_skill_requirements_minimum_level')")" -eq 5
+          echo "Миграция v2 сохранила существующие записи и обновила схему без пересоздания таблиц."
