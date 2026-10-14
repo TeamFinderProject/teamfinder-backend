@@ -24,13 +24,16 @@ internal static class InitialTeamFinderModel
                 e.ToTable("profiles");
                 e.HasKey(x => x.UserId);
                 e.Property(x => x.DisplayName).HasMaxLength(100).IsRequired();
+                e.Property(x => x.Bio);
+                e.Property(x => x.GitHubUrl);
+                e.Property(x => x.PortfolioUrl);
                 e.Property(x => x.UpdatedAt).HasDefaultValueSql("now()");
                 e.HasOne(x => x.User).WithOne(x => x.Profile).HasForeignKey<Profile>(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
             });
             modelBuilder.Entity<Skill>(e =>
             {
                 e.ToTable("skills"); e.HasKey(x => x.Id); e.Property(x => x.Id).UseIdentityByDefaultColumn();
-                e.Property(x => x.Name).HasMaxLength(100).IsRequired(); e.HasIndex(x => x.Name).IsUnique();
+                e.Property(x => x.Name).HasMaxLength(100).IsRequired(); e.Property(x => x.Description); e.HasIndex(x => x.Name).IsUnique();
                 e.HasData(
                     new Skill { Id=1, Name="C#", Description="Язык программирования" }, new Skill { Id=2, Name="ASP.NET Core", Description="Платформа разработки серверных приложений" },
                     new Skill { Id=3, Name="PostgreSQL", Description="Реляционная база данных" }, new Skill { Id=4, Name="Entity Framework Core", Description="ORM для .NET" },
@@ -46,7 +49,7 @@ internal static class InitialTeamFinderModel
             modelBuilder.Entity<RoleType>(e =>
             {
                 e.ToTable("role_types"); e.HasKey(x => x.Id); e.Property(x => x.Id).UseIdentityByDefaultColumn();
-                e.Property(x => x.Name).HasMaxLength(100).IsRequired(); e.HasIndex(x => x.Name).IsUnique();
+                e.Property(x => x.Name).HasMaxLength(100).IsRequired(); e.Property(x => x.Description); e.HasIndex(x => x.Name).IsUnique();
                 e.HasData(
                     new RoleType { Id=1, Name="Backend Developer", Description="Разработчик серверной части" }, new RoleType { Id=2, Name="Frontend Developer", Description="Разработчик пользовательского интерфейса" },
                     new RoleType { Id=3, Name="Fullstack Developer", Description="Разработчик серверной и клиентской частей" }, new RoleType { Id=4, Name="Designer", Description="Дизайнер" },
@@ -74,7 +77,7 @@ internal static class InitialTeamFinderModel
             {
                 e.ToTable("projects", t => t.HasCheckConstraint("CK_projects_status", "\"Status\" IN ('Draft','Recruiting','InProgress','Completed','Cancelled')"));
                 e.HasKey(x => x.Id); e.Property(x => x.Id).UseIdentityByDefaultColumn();
-                e.Property(x => x.Title).HasMaxLength(200).IsRequired(); e.Property(x => x.Description).IsRequired();
+                e.Property(x => x.Title).HasMaxLength(200).IsRequired(); e.Property(x => x.Description).IsRequired(); e.Property(x => x.ExternalContactUrl);
                 e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
                 e.Property(x => x.CreatedAt).HasDefaultValueSql("now()"); e.Property(x => x.UpdatedAt).HasDefaultValueSql("now()");
                 e.HasOne(x => x.Owner).WithMany(x => x.OwnedProjects).HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
@@ -83,7 +86,7 @@ internal static class InitialTeamFinderModel
             {
                 e.ToTable("project_roles", t => t.HasCheckConstraint("CK_project_roles_capacity", "\"Capacity\" > 0"));
                 e.HasKey(x => x.Id); e.Property(x => x.Id).UseIdentityByDefaultColumn();
-                e.Property(x => x.Title).HasMaxLength(150).IsRequired(); e.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
+                e.Property(x => x.Title).HasMaxLength(150).IsRequired(); e.Property(x => x.Description); e.Property(x => x.Capacity); e.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
                 e.HasAlternateKey(x => new { x.Id, x.ProjectId });
                 e.HasOne(x => x.Project).WithMany(x => x.Roles).HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(x => x.RoleType).WithMany(x => x.ProjectRoles).HasForeignKey(x => x.RoleTypeId).OnDelete(DeleteBehavior.Restrict);
@@ -112,6 +115,8 @@ internal static class InitialTeamFinderModel
                 e.HasKey(x => x.Id); e.Property(x => x.Id).UseIdentityByDefaultColumn();
                 e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
                 e.Property(x => x.ClosureReason).HasConversion<string>().HasMaxLength(40);
+                e.Property(x => x.Message);
+                e.Property(x => x.DecidedAt);
                 e.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
                 e.HasIndex(x => new { x.UserId, x.ProjectRoleId }).IsUnique();
                 e.HasOne(x => x.User).WithMany(x => x.Applications).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
