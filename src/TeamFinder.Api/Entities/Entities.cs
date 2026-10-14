@@ -1,10 +1,12 @@
 namespace TeamFinder.Api.Entities;
 
 public enum ProjectStatus { Draft, Recruiting, InProgress, Completed, Cancelled }
+public enum ProjectType { PetProject, Hackathon, Educational }
 public enum ApplicationStatus { Pending, Accepted, Rejected, Withdrawn, Closed }
 public enum ApplicationClosureReason { AcceptedAnotherRole, RoleFilled, RecruitmentClosed, ProjectCancelled }
-public enum SkillLevel { Beginner, Intermediate, Advanced, Expert }
+public enum SkillLevel { Beginner, Intermediate, Advanced }
 public enum RequirementType { Required, NiceToHave }
+public enum MembershipEndReason { Left, Removed }
 
 public sealed class User
 {
@@ -74,6 +76,7 @@ public sealed class Project
     public long OwnerId { get; set; }
     public string Title { get; set; } = "";
     public string Description { get; set; } = "";
+    public ProjectType ProjectType { get; set; }
     public ProjectStatus Status { get; set; } = ProjectStatus.Draft;
     public string? ExternalContactUrl { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
@@ -133,6 +136,8 @@ public sealed class Membership
     public long ProjectId { get; set; }
     public long ProjectRoleId { get; set; }
     public DateTimeOffset JoinedAt { get; set; }
+    public DateTimeOffset? EndedAt { get; set; }
+    public MembershipEndReason? EndReason { get; set; }
     public User User { get; set; } = null!;
     public Project Project { get; set; } = null!;
     public ProjectRole ProjectRole { get; set; } = null!;
