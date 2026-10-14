@@ -49,6 +49,6 @@ jobs:
       - name: Применить миграции к пустой базе
         run: dotnet ef database update --project src/TeamFinder.Api/TeamFinder.Api.csproj --startup-project src/TeamFinder.Api/TeamFinder.Api.csproj
       - name: Проверить справочник навыков
-        run: psql -tAc "SELECT COUNT(*) FROM skills"
+        run: psql -tAc "SELECT COUNT(*) FROM skills" | grep -qx 18
       - name: Проверить справочник типов ролей
-        run: psql -tAc "SELECT COUNT(*) FROM role_types"
+        run: psql -tAc "SELECT COUNT(*) FROM role_types" | grep -qx 8
