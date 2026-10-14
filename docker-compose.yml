@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: teamfinder-postgres
+    environment:
+      POSTGRES_DB: teamfinder
+      POSTGRES_USER: teamfinder
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-teamfinder_local}
+    ports:
+      - "5432:5432"
+    volumes:
+      - teamfinder_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U teamfinder -d teamfinder"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  teamfinder_pgdata:
