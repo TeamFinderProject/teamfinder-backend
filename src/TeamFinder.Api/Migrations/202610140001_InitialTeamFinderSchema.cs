@@ -48,7 +48,7 @@ public sealed class InitialTeamFinderSchema : Migration
             CREATE TABLE user_skills (
                 "UserId" bigint NOT NULL REFERENCES users("Id") ON DELETE RESTRICT,
                 "SkillId" bigint NOT NULL REFERENCES skills("Id") ON DELETE RESTRICT,
-                "Level" varchar(20) NOT NULL CHECK ("Level" IN ('Beginner','Intermediate','Advanced','Expert')),
+                "Level" varchar(20) NOT NULL CHECK ("Level" IN ('Beginner','Intermediate','Advanced')),
                 "CreatedAt" timestamptz NOT NULL DEFAULT now(),
                 PRIMARY KEY ("UserId", "SkillId")
             );
@@ -65,6 +65,7 @@ public sealed class InitialTeamFinderSchema : Migration
                 "OwnerId" bigint NOT NULL REFERENCES users("Id") ON DELETE RESTRICT,
                 "Title" varchar(200) NOT NULL,
                 "Description" text NOT NULL,
+                "ProjectType" varchar(30) NOT NULL CHECK ("ProjectType" IN ('PetProject','Hackathon','Educational')),
                 "Status" varchar(20) NOT NULL CHECK ("Status" IN ('Draft','Recruiting','InProgress','Completed','Cancelled')),
                 "ExternalContactUrl" text,
                 "CreatedAt" timestamptz NOT NULL DEFAULT now(),
@@ -86,7 +87,7 @@ public sealed class InitialTeamFinderSchema : Migration
                 "ProjectRoleId" bigint NOT NULL REFERENCES project_roles("Id") ON DELETE RESTRICT,
                 "SkillId" bigint NOT NULL REFERENCES skills("Id") ON DELETE RESTRICT,
                 "RequirementType" varchar(20) NOT NULL CHECK ("RequirementType" IN ('Required','NiceToHave')),
-                "MinimumLevel" varchar(20) CHECK ("MinimumLevel" IS NULL OR "MinimumLevel" IN ('Beginner','Intermediate','Advanced','Expert')),
+                "MinimumLevel" varchar(20) CHECK ("MinimumLevel" IS NULL OR "MinimumLevel" IN ('Beginner','Intermediate','Advanced')),
                 PRIMARY KEY ("ProjectRoleId", "SkillId")
             );
 
@@ -111,6 +112,9 @@ public sealed class InitialTeamFinderSchema : Migration
                 "ProjectId" bigint NOT NULL REFERENCES projects("Id") ON DELETE RESTRICT,
                 "ProjectRoleId" bigint NOT NULL,
                 "JoinedAt" timestamptz NOT NULL DEFAULT now(),
+                "EndedAt" timestamptz,
+                "EndReason" varchar(20) CHECK ("EndReason" IS NULL OR "EndReason" IN ('Left','Removed')),
+                CONSTRAINT "CK_memberships_end_state" CHECK (("EndedAt" IS NULL AND "EndReason" IS NULL) OR ("EndedAt" IS NOT NULL AND "EndReason" IS NOT NULL)),
                 CONSTRAINT "FK_memberships_project_roles_role_project" FOREIGN KEY ("ProjectRoleId", "ProjectId") REFERENCES project_roles("Id", "ProjectId") ON DELETE RESTRICT
             );
             CREATE UNIQUE INDEX "IX_memberships_UserId_ProjectId" ON memberships ("UserId", "ProjectId");
