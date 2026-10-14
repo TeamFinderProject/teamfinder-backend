@@ -48,17 +48,32 @@ jobs:
       - name: Установить EF Core CLI
         run: dotnet tool install --global dotnet-ef --version 10.0.12
 
-      - name: Применить только исходную схему v1
-        run: dotnet ef database update InitialTeamFinderSchema --project src/TeamFinder.Api/TeamFinder.Api.csproj --startup-project src/TeamFinder.Api/TeamFinder.Api.csproj
-
       - name: Установить клиент PostgreSQL
         run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
 
-      - name: Подготовить тестовые данные предыдущей схемы
+      - name: Подготовить существующую схему v1 и тестовые данные
         run: |
-          psql <<'SQL'
+          # Выполняем SQL из исходной миграции v1, чтобы тестировать upgrade на той же схеме.
+          awk '
+            /migrationBuilder\.Sql\("""/ { in_sql = 1; next }
+            in_sql && /""");/ { exit }
+            in_sql {
+              sub(/^            /, "")
+              print
+            }
+          ' src/TeamFinder.Api/Migrations/202610140001_InitialTeamFinderSchema.cs > /tmp/teamfinder-v1.sql
+          test -s /tmp/teamfinder-v1.sql
+          psql -v ON_ERROR_STOP=1 -f /tmp/teamfinder-v1.sql
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE "__EFMigrationsHistory" (
+              "MigrationId" character varying(150) NOT NULL CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY,
+              "ProductVersion" character varying(32) NOT NULL
+          );
+          INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+          VALUES ('202610140001_InitialTeamFinderSchema', '10.0.12');
+
           DO $$
           DECLARE
               owner_id bigint;
@@ -90,7 +105,7 @@ jobs:
           END $$;
           SQL
 
-      - name: Применить новую миграцию к существующей схеме
+      - name: Обновить существующую БД до новой схемы
         run: dotnet ef database update --project src/TeamFinder.Api/TeamFinder.Api.csproj --startup-project src/TeamFinder.Api/TeamFinder.Api.csproj
 
       - name: Проверить таблицы и справочники
@@ -107,4 +122,4 @@ jobs:
           test "$(psql -tAc "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'projects' AND column_name = 'ProjectType'")" -eq 1
           test "$(psql -tAc "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'memberships' AND column_name IN ('EndedAt','EndReason')")" -eq 2
           test "$(psql -tAc "SELECT COUNT(*) FROM pg_constraint WHERE conname IN ('CK_projects_project_type','CK_memberships_end_reason','CK_memberships_end_state','CK_user_skills_level','CK_role_skill_requirements_minimum_level')")" -eq 5
-          echo "Миграция v2 сохранила существующие записи и обновила схему без пересоздания таблиц."
+          echo "Переход со схемы v1 на v2 сохранил существующие записи и добавил новые поля без пересоздания таблиц."
