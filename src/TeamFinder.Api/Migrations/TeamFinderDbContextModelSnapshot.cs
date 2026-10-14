@@ -18,6 +18,6 @@ public sealed class TeamFinderDbContextModelSnapshot : ModelSnapshot
             .HasAnnotation("Relational:MaxIdentifierLength", 63)
             .HasAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
 
-        InitialTeamFinderModel.ConfigureModel(modelBuilder);
+        TeamFinderModelV2.ConfigureModel(modelBuilder);
     }
 }
