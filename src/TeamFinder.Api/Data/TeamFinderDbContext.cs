@@ -74,7 +74,7 @@ public sealed class TeamFinderDbContext(DbContextOptions<TeamFinderDbContext> op
         });
         modelBuilder.Entity<UserSkill>(e =>
         {
-            e.ToTable("user_skills", t => t.HasCheckConstraint("CK_user_skills_level", "\"Level\" IN ('Beginner','Intermediate','Advanced','Expert')"));
+            e.ToTable("user_skills", t => t.HasCheckConstraint("CK_user_skills_level", "\"Level\" IN ('Beginner','Intermediate','Advanced')"));
             e.HasKey(x => new { x.UserId, x.SkillId });
             e.Property(x => x.Level).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
@@ -90,9 +90,14 @@ public sealed class TeamFinderDbContext(DbContextOptions<TeamFinderDbContext> op
         });
         modelBuilder.Entity<Project>(e =>
         {
-            e.ToTable("projects", t => t.HasCheckConstraint("CK_projects_status", "\"Status\" IN ('Draft','Recruiting','InProgress','Completed','Cancelled')"));
+            e.ToTable("projects", t =>
+            {
+                t.HasCheckConstraint("CK_projects_status", "\"Status\" IN ('Draft','Recruiting','InProgress','Completed','Cancelled')");
+                t.HasCheckConstraint("CK_projects_project_type", "\"ProjectType\" IN ('PetProject','Hackathon','Educational')");
+            });
             e.HasKey(x => x.Id); e.Property(x => x.Id).UseIdentityByDefaultColumn();
             e.Property(x => x.Title).HasMaxLength(200).IsRequired(); e.Property(x => x.Description).IsRequired();
+            e.Property(x => x.ProjectType).HasConversion<string>().HasMaxLength(30);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.CreatedAt).HasDefaultValueSql("now()"); e.Property(x => x.UpdatedAt).HasDefaultValueSql("now()");
             e.HasOne(x => x.Owner).WithMany(x => x.OwnedProjects).HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
@@ -111,7 +116,7 @@ public sealed class TeamFinderDbContext(DbContextOptions<TeamFinderDbContext> op
             e.ToTable("role_skill_requirements", t =>
             {
                 t.HasCheckConstraint("CK_role_skill_requirements_type", "\"RequirementType\" IN ('Required','NiceToHave')");
-                t.HasCheckConstraint("CK_role_skill_requirements_minimum_level", "\"MinimumLevel\" IS NULL OR \"MinimumLevel\" IN ('Beginner','Intermediate','Advanced','Expert')");
+                t.HasCheckConstraint("CK_role_skill_requirements_minimum_level", "\"MinimumLevel\" IS NULL OR \"MinimumLevel\" IN ('Beginner','Intermediate','Advanced')");
             });
             e.HasKey(x => new { x.ProjectRoleId, x.SkillId });
             e.Property(x => x.RequirementType).HasConversion<string>().HasMaxLength(20);
@@ -138,8 +143,14 @@ public sealed class TeamFinderDbContext(DbContextOptions<TeamFinderDbContext> op
         });
         modelBuilder.Entity<Membership>(e =>
         {
-            e.ToTable("memberships"); e.HasKey(x => x.Id); e.Property(x => x.Id).UseIdentityByDefaultColumn();
+            e.ToTable("memberships", t =>
+            {
+                t.HasCheckConstraint("CK_memberships_end_reason", "\"EndReason\" IS NULL OR \"EndReason\" IN ('Left','Removed')");
+                t.HasCheckConstraint("CK_memberships_end_state", "(\"EndedAt\" IS NULL AND \"EndReason\" IS NULL) OR (\"EndedAt\" IS NOT NULL AND \"EndReason\" IS NOT NULL)");
+            });
+            e.HasKey(x => x.Id); e.Property(x => x.Id).UseIdentityByDefaultColumn();
             e.Property(x => x.JoinedAt).HasDefaultValueSql("now()");
+            e.Property(x => x.EndReason).HasConversion<string>().HasMaxLength(20);
             e.HasIndex(x => new { x.UserId, x.ProjectId }).IsUnique();
             e.HasOne(x => x.User).WithMany(x => x.Memberships).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Project).WithMany(x => x.Memberships).HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
