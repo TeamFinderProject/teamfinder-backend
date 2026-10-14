@@ -38,6 +38,20 @@ jobs:
         run: dotnet build src/TeamFinder.Api/TeamFinder.Api.csproj --configuration Release --no-restore
       - name: Установить EF Core CLI
         run: dotnet tool install --global dotnet-ef --version 10.0.12
+      - name: Диагностировать расхождение модели EF Core
+        run: |
+          dotnet ef migrations add SyncModelSnapshot --project src/TeamFinder.Api/TeamFinder.Api.csproj --startup-project src/TeamFinder.Api/TeamFinder.Api.csproj
+          echo "=== Сгенерированная диагностическая миграция ==="
+          cat src/TeamFinder.Api/Migrations/*_SyncModelSnapshot.cs
+          echo "=== Новый снимок модели ==="
+          cat src/TeamFinder.Api/Migrations/TeamFinderDbContextModelSnapshot.cs
+      - name: Сохранить диагностические файлы EF Core
+        uses: actions/upload-artifact@v4
+        with:
+          name: efcore-model-snapshot-diagnostic
+          path: |
+            src/TeamFinder.Api/Migrations/*_SyncModelSnapshot.cs
+            src/TeamFinder.Api/Migrations/TeamFinderDbContextModelSnapshot.cs
       - name: Применить миграции к пустой базе
         run: dotnet ef database update --project src/TeamFinder.Api/TeamFinder.Api.csproj --startup-project src/TeamFinder.Api/TeamFinder.Api.csproj
       - name: Проверить таблицы и справочники
