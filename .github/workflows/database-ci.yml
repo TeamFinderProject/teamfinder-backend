@@ -1,0 +1,54 @@
+name: Проверка базы данных
+
+on:
+  pull_request:
+    branches:
+      - feature/backend-skeleton
+      - main
+  push:
+    branches:
+      - feature/database-skeleton-integration
+
+jobs:
+  build-and-migrate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: teamfinder
+          POSTGRES_USER: teamfinder
+          POSTGRES_PASSWORD: teamfinder_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U teamfinder -d teamfinder"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ConnectionStrings__TeamFinder: Host=localhost;Port=5432;Database=teamfinder;Username=teamfinder;Password=teamfinder_ci
+      PGHOST: localhost
+      PGPORT: 5432
+      PGDATABASE: teamfinder
+      PGUSER: teamfinder
+      PGPASSWORD: teamfinder_ci
+    steps:
+      - name: Получить исходный код
+        uses: actions/checkout@v4
+      - name: Установить .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Восстановить зависимости
+        run: dotnet restore src/TeamFinder.Api/TeamFinder.Api.csproj
+      - name: Собрать проект
+        run: dotnet build src/TeamFinder.Api/TeamFinder.Api.csproj --configuration Release --no-restore
+      - name: Установить EF Core CLI
+        run: dotnet tool install --global dotnet-ef --version 10.0.12
+      - name: Применить миграции к пустой базе
+        run: dotnet ef database update --project src/TeamFinder.Api/TeamFinder.Api.csproj --startup-project src/TeamFinder.Api/TeamFinder.Api.csproj
+      - name: Проверить справочник навыков
+        run: psql -tAc "SELECT COUNT(*) FROM skills"
+      - name: Проверить справочник типов ролей
+        run: psql -tAc "SELECT COUNT(*) FROM role_types"
