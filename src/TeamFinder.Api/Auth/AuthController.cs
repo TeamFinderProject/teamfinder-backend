@@ -63,7 +63,7 @@ public sealed class AuthController(AuthService auth, IOptions<JwtOptions> option
         return NoContent();
     }
 
-    /// <summary>Текущий пользователь по access token. Frontend вызывает его, чтобы узнать, кто вошёл.</summary>
+    /// <summary>Текущий пользователь по access token.</summary>
     [HttpGet("me")]
     [Authorize]
     public Task<UserSummary> Me(CancellationToken ct) => auth.GetCurrentUserAsync(User.GetUserId(), ct);
