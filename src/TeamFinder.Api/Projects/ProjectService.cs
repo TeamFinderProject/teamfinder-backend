@@ -406,7 +406,7 @@ public sealed class ProjectService(TeamFinderDbContext db, NotificationService n
     {
         if (!allowedFrom.Contains(project.Status))
             throw AppException.Conflict("INVALID_STATE_TRANSITION",
-                $"Действие недоступно для проекта в состоянии {project.Status}");
+                $"Действие недоступно: проект {StateName(project.Status)}");
     }
 
     private static void EnsureNoDuplicateSkills(IReadOnlyCollection<RequirementInput> requirements, string field)
@@ -472,6 +472,16 @@ public sealed class ProjectService(TeamFinderDbContext db, NotificationService n
         foreach (var memberId in memberIds)
             notifications.Add(memberId, type, text, project.Id);
     }
+
+    private static string StateName(ProjectStatus status) => status switch
+    {
+        ProjectStatus.Draft => "ещё черновик",
+        ProjectStatus.Recruiting => "в наборе",
+        ProjectStatus.InProgress => "уже в работе",
+        ProjectStatus.Completed => "завершён",
+        ProjectStatus.Cancelled => "отменён",
+        _ => status.ToString(),
+    };
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
