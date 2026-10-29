@@ -1,13 +1,13 @@
-name: Проверка базы данных
+name: Backend CI
 
 on:
   pull_request:
-    branches: [main, "feature/backend-skeleton"]
+    branches: [main, develop]
   push:
-    branches: [main, "feature/**"]
+    branches: [main, develop]
 
 jobs:
-  build-and-migrate:
+  build-test:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -25,27 +25,45 @@ jobs:
           --health-retries 10
     env:
       ConnectionStrings__TeamFinder: Host=localhost;Port=5432;Database=teamfinder;Username=teamfinder;Password=teamfinder_ci
+      TEST_DB_CONNECTION: Host=localhost;Port=5432;Database=teamfinder_tests;Username=teamfinder;Password=teamfinder_ci
+      Jwt__SigningKey: ci-only-signing-key-0123456789-0123456789
+      PGHOST: localhost
+      PGPORT: 5432
+      PGDATABASE: teamfinder
+      PGUSER: teamfinder
+      PGPASSWORD: teamfinder_ci
     steps:
       - name: Получить исходный код
         uses: actions/checkout@v4
+
       - name: Установить .NET SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+
       - name: Восстановить зависимости
-        run: dotnet restore src/TeamFinder.Api/TeamFinder.Api.csproj
-      - name: Собрать проект
-        run: dotnet build src/TeamFinder.Api/TeamFinder.Api.csproj --configuration Release --no-restore
+        run: dotnet restore TeamFinder.slnx
+
+      - name: Собрать
+        run: dotnet build TeamFinder.slnx --configuration Release --no-restore
+
       - name: Установить EF Core CLI
         run: dotnet tool install --global dotnet-ef --version 10.0.12
+
+      - name: Проверить, что миграции соответствуют модели
+        # Падает, если сущности изменили, а миграцию не добавили.
+        run: dotnet ef migrations has-pending-model-changes --project src/TeamFinder.Api --startup-project src/TeamFinder.Api --configuration Release --no-build
+
       - name: Применить миграции к пустой базе
-        run: dotnet ef database update --project src/TeamFinder.Api/TeamFinder.Api.csproj --startup-project src/TeamFinder.Api/TeamFinder.Api.csproj
+        run: dotnet ef database update --project src/TeamFinder.Api --startup-project src/TeamFinder.Api --configuration Release --no-build
+
       - name: Проверить таблицы и справочники
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes postgresql-client
-          export PGHOST=localhost PGPORT=5432 PGDATABASE=teamfinder PGUSER=teamfinder PGPASSWORD=teamfinder_ci
+          sudo apt-get update -qq && sudo apt-get install --yes -qq postgresql-client
           test "$(psql -tAc 'SELECT COUNT(*) FROM skills')" -eq 18
           test "$(psql -tAc 'SELECT COUNT(*) FROM role_types')" -eq 8
-          test "$(psql -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name IN ('users','profiles','skills','role_types','user_skills','user_role_interests','projects','project_roles','role_skill_requirements','applications','memberships')")" -eq 11
-          echo "Создание схемы и заполнение справочников проверены."
+          test "$(psql -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('users','profiles','skills','role_types','user_skills','user_role_interests','projects','project_roles','role_skill_requirements','applications','memberships','refresh_tokens','notifications','telegram_links','telegram_link_codes')")" -eq 15
+          echo "Схема из миграций создана, справочники заполнены."
+
+      - name: Тесты бизнес-правил (API + PostgreSQL)
+        run: dotnet test TeamFinder.slnx --configuration Release --no-build --logger "console;verbosity=normal"

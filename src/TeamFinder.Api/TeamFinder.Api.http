@@ -1,6 +1,143 @@
-@TeamFinder.Api_HostAddress = http://localhost:5017
+# Ручная проверка основного сценария (Rider / VS Code REST Client).
+# Порядок: зарегистрировать владельца → создать проект с ролями → зарегистрировать кандидата →
+# подать заявку → войти владельцем → принять заявку → посмотреть команду.
+# accessToken подставляйте из ответа register/login.
 
-GET {{TeamFinder.Api_HostAddress}}/health
-Accept: application/json
+@host = http://localhost:5017
+@ownerToken = <accessToken владельца>
+@candidateToken = <accessToken кандидата>
+@projectId = 1
+@roleId = 1
+@applicationId = 1
+
+### Сервер жив
+GET {{host}}/health
+
+### Справочники (доступны без входа)
+GET {{host}}/api/skills
 
 ###
+GET {{host}}/api/role-types
+
+### 1. Регистрация владельца — refresh token придёт в cookie tf_refresh
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{ "email": "owner@example.com", "password": "Secret123!", "displayName": "Иван" }
+
+### 1a. Вход
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "owner@example.com", "password": "Secret123!" }
+
+### 1b. Обновить access token по cookie (клиент отправит tf_refresh сам)
+POST {{host}}/api/auth/refresh
+
+### 1c. Кто вошёл
+GET {{host}}/api/auth/me
+Authorization: Bearer {{ownerToken}}
+
+### 1d. Демо-вход (демо-данные включены в Development): ivan / petr / anna / maria
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "petr@demo.local", "password": "Demo12345!" }
+
+### 2. Создать проект вместе с ролями и навыками — один запрос
+POST {{host}}/api/projects
+Authorization: Bearer {{ownerToken}}
+Content-Type: application/json
+
+{
+  "title": "TeamFinder",
+  "description": "Сервис поиска участников и формирования команд",
+  "type": "STUDY_PROJECT",
+  "externalContactUrl": "https://t.me/teamfinder_dev",
+  "publish": true,
+  "roles": [
+    {
+      "roleTypeId": 1,
+      "description": "API и бизнес-логика",
+      "capacity": 1,
+      "requirements": [
+        { "skillId": 1, "type": "REQUIRED", "minimumLevel": "INTERMEDIATE" },
+        { "skillId": 9, "type": "NICE_TO_HAVE" }
+      ]
+    },
+    { "roleTypeId": 4, "capacity": 1, "requirements": [ { "skillId": 13, "type": "REQUIRED" } ] }
+  ]
+}
+
+### 3. Регистрация кандидата
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{ "email": "candidate@example.com", "password": "Secret123!", "displayName": "Пётр" }
+
+### 4. Кандидат заполняет профиль
+PUT {{host}}/api/profile
+Authorization: Bearer {{candidateToken}}
+Content-Type: application/json
+
+{
+  "displayName": "Пётр",
+  "bio": "Пишу на C#",
+  "githubUrl": "https://github.com/petr",
+  "interestedRoleTypeIds": [1],
+  "skills": [ { "skillId": 1, "level": "ADVANCED" } ]
+}
+
+### 5. Каталог с фильтрами
+GET {{host}}/api/projects?type=STUDY_PROJECT&openOnly=true
+Authorization: Bearer {{candidateToken}}
+
+### 6. Matching кандидата для роли
+GET {{host}}/api/projects/{{projectId}}/roles/{{roleId}}/match
+Authorization: Bearer {{candidateToken}}
+
+### 7. Заявка на конкретную роль конкретного проекта
+POST {{host}}/api/projects/{{projectId}}/roles/{{roleId}}/applications
+Authorization: Bearer {{candidateToken}}
+Content-Type: application/json
+
+{ "message": "Есть опыт с C#, хочу заниматься backend" }
+
+### 8. Заявки проекта (владелец)
+GET {{host}}/api/projects/{{projectId}}/applications?status=PENDING
+Authorization: Bearer {{ownerToken}}
+
+### 9. Принять заявку
+POST {{host}}/api/applications/{{applicationId}}/accept
+Authorization: Bearer {{ownerToken}}
+
+### 9a. Повторное принятие — 409 APPLICATION_NOT_PENDING
+POST {{host}}/api/applications/{{applicationId}}/accept
+Authorization: Bearer {{ownerToken}}
+
+### 10. Команда
+GET {{host}}/api/projects/{{projectId}}/team
+Authorization: Bearer {{ownerToken}}
+
+### 11. Уведомления кандидата
+GET {{host}}/api/notifications
+Authorization: Bearer {{candidateToken}}
+
+### 12. Исключить участника: id в пути, у DELETE нет тела
+DELETE {{host}}/api/projects/{{projectId}}/members/2
+Authorization: Bearer {{ownerToken}}
+
+### 13. Перевести проект в работу
+POST {{host}}/api/projects/{{projectId}}/start
+Authorization: Bearer {{ownerToken}}
+
+### 14. Telegram: статус и ссылка для привязки
+GET {{host}}/api/profile/telegram
+Authorization: Bearer {{candidateToken}}
+
+###
+POST {{host}}/api/profile/telegram/link
+Authorization: Bearer {{candidateToken}}
+
+### Выход
+POST {{host}}/api/auth/logout

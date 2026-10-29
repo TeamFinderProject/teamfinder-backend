@@ -1,0 +1,1116 @@
+openapi: 3.0.3
+info:
+  title: TeamFinder API — контракт
+  version: 1.2.0
+  description: |
+    Машиночитаемый контракт TeamFinder v1. Человекочитаемое описание и бизнес-правила —
+    в `api-contracts-v1.md`. При расхождении сначала правится этот файл, потом код.
+
+    Аутентификация: JWT access token в заголовке `Authorization: Bearer <token>` (15 минут)
+    и refresh token в HttpOnly-cookie `tf_refresh` (14 дней, ротация при каждом обновлении).
+    Чтобы вызывать запросы из Swagger: Authorize → вставить accessToken из ответа /api/auth/login.
+servers:
+  - url: /
+    description: Текущий сервер
+tags:
+  - name: Auth
+  - name: Profile
+  - name: Dictionaries
+  - name: Projects
+  - name: Project Roles
+  - name: Applications
+  - name: Team
+  - name: Notifications
+security:
+  - bearerAuth: []
+
+paths:
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Регистрация и сразу вход
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Пользователь создан. Refresh token установлен в cookie.
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/RefreshCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Вход
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Вход выполнен
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/RefreshCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429':
+          description: Слишком много попыток входа (TOO_MANY_ATTEMPTS)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Новый access token по refresh-cookie (с ротацией)
+      security:
+        - refreshCookie: []
+      responses:
+        '200':
+          description: Выдан новый access token, refresh token заменён
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/RefreshCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Выход — отзыв refresh token и удаление cookie
+      security:
+        - refreshCookie: []
+      responses:
+        '204': { description: Выход выполнен }
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Текущий пользователь по access token
+      responses:
+        '200':
+          description: Пользователь
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/profile:
+    get:
+      tags: [Profile]
+      summary: Мой профиль
+      responses:
+        '200':
+          description: Профиль
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [Profile]
+      summary: Сохранить профиль целиком (списки заменяются)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProfileRequest' }
+      responses:
+        '200':
+          description: Обновлённый профиль
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/profile/telegram:
+    get:
+      tags: [Notifications]
+      summary: Подключён ли Telegram
+      responses:
+        '200':
+          description: Статус Telegram
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TelegramStatus' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Notifications]
+      summary: Отключить Telegram (тела нет)
+      responses:
+        '204': { description: Отключено }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/profile/telegram/link:
+    post:
+      tags: [Notifications]
+      summary: Одноразовая ссылка на бота (код живёт 10 минут)
+      responses:
+        '200':
+          description: Ссылка t.me/<бот>?start=<код>
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TelegramLink' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/skills:
+    get:
+      tags: [Dictionaries]
+      summary: Справочник навыков
+      security: []
+      responses:
+        '200':
+          description: Навыки
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DictionaryItem' }
+
+  /api/role-types:
+    get:
+      tags: [Dictionaries]
+      summary: Справочник типов ролей
+      security: []
+      responses:
+        '200':
+          description: Типы ролей
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DictionaryItem' }
+
+  /api/projects:
+    get:
+      tags: [Projects]
+      summary: Каталог проектов (без черновиков)
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: type, in: query, schema: { $ref: '#/components/schemas/ProjectType' } }
+        - { name: roleTypeId, in: query, schema: { type: integer, format: int64 } }
+        - { name: skillId, in: query, schema: { type: integer, format: int64 } }
+        - { name: openOnly, in: query, schema: { type: boolean, default: false } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: Страница каталога
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectCardPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Projects]
+      summary: Создать проект вместе с ролями и требованиями (одна транзакция)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateProjectRequest' }
+      responses:
+        '201':
+          description: Проект создан
+          headers:
+            Location:
+              description: Адрес созданного проекта
+              schema: { type: string, example: /api/projects/42 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectDetails' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/projects/mine:
+    get:
+      tags: [Projects]
+      summary: Проекты, где я владелец или участник
+      responses:
+        '200':
+          description: Мои проекты
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MyProjectCard' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/projects/{projectId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    get:
+      tags: [Projects]
+      summary: Страница проекта
+      responses:
+        '200':
+          description: Проект
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectDetails' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Projects]
+      summary: Изменить поля проекта
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProjectRequest' }
+      responses:
+        '200':
+          description: Проект
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectDetails' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/projects/{projectId}/publish:
+    parameters: [ { $ref: '#/components/parameters/ProjectId' } ]
+    post:
+      tags: [Projects]
+      summary: DRAFT → RECRUITING
+      responses:
+        '200': { $ref: '#/components/responses/ProjectStateChanged' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/projects/{projectId}/start:
+    parameters: [ { $ref: '#/components/parameters/ProjectId' } ]
+    post:
+      tags: [Projects]
+      summary: RECRUITING → IN_PROGRESS (ожидающие заявки закрываются)
+      responses:
+        '200': { $ref: '#/components/responses/ProjectStateChanged' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/projects/{projectId}/complete:
+    parameters: [ { $ref: '#/components/parameters/ProjectId' } ]
+    post:
+      tags: [Projects]
+      summary: IN_PROGRESS → COMPLETED
+      responses:
+        '200': { $ref: '#/components/responses/ProjectStateChanged' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/projects/{projectId}/cancel:
+    parameters: [ { $ref: '#/components/parameters/ProjectId' } ]
+    post:
+      tags: [Projects]
+      summary: Отменить проект (ожидающие заявки закрываются)
+      responses:
+        '200': { $ref: '#/components/responses/ProjectStateChanged' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/projects/{projectId}/roles:
+    parameters: [ { $ref: '#/components/parameters/ProjectId' } ]
+    post:
+      tags: [Project Roles]
+      summary: Добавить роль в существующий проект
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoleInput' }
+      responses:
+        '201':
+          description: Роль создана
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectRole' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/projects/{projectId}/roles/{roleId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/RoleId'
+    patch:
+      tags: [Project Roles]
+      summary: Изменить роль (тип и навыки — только до первой заявки)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateRoleRequest' }
+      responses:
+        '200':
+          description: Роль
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectRole' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Project Roles]
+      summary: Удалить роль, на которую не было заявок
+      responses:
+        '204': { description: Роль удалена }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/projects/{projectId}/roles/{roleId}/close:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/RoleId'
+    post:
+      tags: [Project Roles]
+      summary: Закрыть набор на роль
+      responses:
+        '200':
+          description: Роль закрыта
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProjectRole' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/projects/{projectId}/roles/{roleId}/match:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/RoleId'
+    get:
+      tags: [Project Roles]
+      summary: Объяснимое сопоставление навыков текущего пользователя с ролью
+      responses:
+        '200':
+          description: Результат matching
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MatchResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/projects/{projectId}/roles/{roleId}/applications:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/RoleId'
+    post:
+      tags: [Applications]
+      summary: Подать заявку на конкретную роль проекта
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ApplyRequest' }
+      responses:
+        '201':
+          description: Заявка создана в статусе PENDING
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Application' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/applications/mine:
+    get:
+      tags: [Applications]
+      summary: Мои заявки
+      responses:
+        '200':
+          description: Заявки текущего пользователя
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MyApplication' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/applications/{applicationId}/withdraw:
+    parameters: [ { $ref: '#/components/parameters/ApplicationId' } ]
+    post:
+      tags: [Applications]
+      summary: Отозвать свою заявку (только PENDING)
+      responses:
+        '200':
+          description: Заявка в статусе WITHDRAWN
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Application' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/applications/{applicationId}/accept:
+    parameters: [ { $ref: '#/components/parameters/ApplicationId' } ]
+    post:
+      tags: [Applications]
+      summary: Принять заявку (атомарно создаёт Membership)
+      responses:
+        '200':
+          description: Заявка в статусе ACCEPTED, membershipId заполнен
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Application' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/applications/{applicationId}/reject:
+    parameters: [ { $ref: '#/components/parameters/ApplicationId' } ]
+    post:
+      tags: [Applications]
+      summary: Отклонить заявку
+      responses:
+        '200':
+          description: Заявка в статусе REJECTED
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Application' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/projects/{projectId}/applications:
+    parameters: [ { $ref: '#/components/parameters/ProjectId' } ]
+    get:
+      tags: [Applications]
+      summary: Заявки на роли проекта (для владельца)
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/ApplicationStatus' } }
+        - { name: roleId, in: query, schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          description: Заявки проекта
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProjectApplication' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/projects/{projectId}/team:
+    parameters: [ { $ref: '#/components/parameters/ProjectId' } ]
+    get:
+      tags: [Team]
+      summary: Состав команды и внешний контакт
+      responses:
+        '200':
+          description: Команда
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Team' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/projects/{projectId}/team/leave:
+    parameters: [ { $ref: '#/components/parameters/ProjectId' } ]
+    post:
+      tags: [Team]
+      summary: Выйти из команды
+      responses:
+        '204': { description: Участие завершено (LEFT) }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/projects/{projectId}/members/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - name: userId
+        in: path
+        required: true
+        description: Участник, которого исключают. Передаётся в пути — у DELETE нет тела (RFC 9110, 9.3.5).
+        schema: { type: integer, format: int64 }
+    delete:
+      tags: [Team]
+      summary: Исключить участника из команды
+      responses:
+        '204': { description: Участие завершено (REMOVED) }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: Мои уведомления (до 50, новые сверху)
+      parameters:
+        - { name: unreadOnly, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: Уведомления
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Notification' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/notifications/{notificationId}/read:
+    parameters:
+      - name: notificationId
+        in: path
+        required: true
+        schema: { type: integer, format: int64 }
+    post:
+      tags: [Notifications]
+      summary: Отметить уведомление прочитанным
+      responses:
+        '204': { description: Отмечено }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Отметить все уведомления прочитанными
+      responses:
+        '204': { description: Отмечено }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token из ответа /api/auth/login, срок жизни 15 минут
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: tf_refresh
+      description: HttpOnly refresh token, браузер отправляет его сам
+
+  headers:
+    RefreshCookie:
+      description: 'tf_refresh=<token>; HttpOnly; Secure; SameSite=Strict; Path=/api/auth'
+      schema: { type: string }
+
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    RoleId:
+      name: roleId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    ApplicationId:
+      name: applicationId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+
+  responses:
+    ValidationError:
+      description: Ошибка валидации (VALIDATION_ERROR, DUPLICATE_SKILL, UNKNOWN_SKILL, UNKNOWN_ROLE_TYPE)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Нет или недействителен токен (UNAUTHORIZED, INVALID_CREDENTIALS, INVALID_REFRESH_TOKEN)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Нет прав (FORBIDDEN)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Не найдено (NOT_FOUND)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Нарушено бизнес-правило — код ошибки в поле code (раздел 14 api-contracts-v1.md)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ProjectStateChanged:
+      description: Состояние проекта изменено
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [id, state]
+            properties:
+              id: { type: integer, format: int64 }
+              state: { $ref: '#/components/schemas/ProjectState' }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, example: ROLE_FULL }
+        message: { type: string, example: Все места на этой роли уже заняты }
+        errors:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: array
+            items: { type: string }
+
+    ProjectType:
+      type: string
+      enum: [PET_PROJECT, HACKATHON, STUDY_PROJECT]
+    ProjectState:
+      type: string
+      enum: [DRAFT, RECRUITING, IN_PROGRESS, COMPLETED, CANCELLED]
+    ApplicationStatus:
+      type: string
+      enum: [PENDING, ACCEPTED, REJECTED, WITHDRAWN, CLOSED]
+    ApplicationCloseReason:
+      type: string
+      enum: [ACCEPTED_ANOTHER_ROLE, ROLE_FILLED, ROLE_CLOSED, RECRUITMENT_CLOSED, PROJECT_CANCELLED]
+    SkillLevel:
+      type: string
+      enum: [BEGINNER, INTERMEDIATE, ADVANCED]
+    RequirementType:
+      type: string
+      enum: [REQUIRED, NICE_TO_HAVE]
+    ProjectRelation:
+      type: string
+      enum: [OWNER, MEMBER, NONE]
+    MatchStatus:
+      type: string
+      enum: [MATCHED, LEVEL_TOO_LOW, MISSING]
+    NotificationType:
+      type: string
+      enum:
+        - APPLICATION_RECEIVED
+        - APPLICATION_ACCEPTED
+        - APPLICATION_REJECTED
+        - APPLICATION_CLOSED
+        - MEMBER_LEFT
+        - MEMBER_REMOVED
+        - PROJECT_STARTED
+        - PROJECT_COMPLETED
+        - PROJECT_CANCELLED
+
+    RegisterRequest:
+      type: object
+      required: [email, password, displayName]
+      properties:
+        email: { type: string, format: email, maxLength: 320 }
+        password: { type: string, minLength: 8, maxLength: 128 }
+        displayName: { type: string, minLength: 2, maxLength: 100 }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    UserSummary:
+      type: object
+      required: [id, email, displayName]
+      properties:
+        id: { type: integer, format: int64 }
+        email: { type: string }
+        displayName: { type: string }
+    AuthResponse:
+      type: object
+      required: [accessToken, tokenType, expiresIn, user]
+      properties:
+        accessToken: { type: string }
+        tokenType: { type: string, example: Bearer }
+        expiresIn: { type: integer, description: Секунды до истечения access token, example: 900 }
+        user: { $ref: '#/components/schemas/UserSummary' }
+
+    DictionaryItem:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+    PersonRef:
+      type: object
+      required: [id, displayName]
+      properties:
+        id: { type: integer, format: int64 }
+        displayName: { type: string }
+    UserSkill:
+      type: object
+      required: [skillId, name, level]
+      properties:
+        skillId: { type: integer, format: int64 }
+        name: { type: string }
+        level: { $ref: '#/components/schemas/SkillLevel' }
+    Profile:
+      type: object
+      required: [id, email, displayName, interestedRoleTypes, skills]
+      properties:
+        id: { type: integer, format: int64 }
+        email: { type: string }
+        displayName: { type: string }
+        bio: { type: string, nullable: true }
+        githubUrl: { type: string, nullable: true }
+        portfolioUrl: { type: string, nullable: true }
+        interestedRoleTypes:
+          type: array
+          items: { $ref: '#/components/schemas/DictionaryItem' }
+        skills:
+          type: array
+          items: { $ref: '#/components/schemas/UserSkill' }
+    UpdateProfileRequest:
+      type: object
+      required: [displayName, interestedRoleTypeIds, skills]
+      properties:
+        displayName: { type: string, minLength: 2, maxLength: 100 }
+        bio: { type: string, nullable: true, maxLength: 2000 }
+        githubUrl: { type: string, nullable: true, format: uri }
+        portfolioUrl: { type: string, nullable: true, format: uri }
+        interestedRoleTypeIds:
+          type: array
+          items: { type: integer, format: int64 }
+        skills:
+          type: array
+          items:
+            type: object
+            required: [skillId, level]
+            properties:
+              skillId: { type: integer, format: int64 }
+              level: { $ref: '#/components/schemas/SkillLevel' }
+
+    RequirementInput:
+      type: object
+      required: [skillId, type]
+      properties:
+        skillId: { type: integer, format: int64 }
+        type: { $ref: '#/components/schemas/RequirementType' }
+        minimumLevel:
+          allOf: [ { $ref: '#/components/schemas/SkillLevel' } ]
+          nullable: true
+    RoleInput:
+      type: object
+      required: [roleTypeId, capacity]
+      properties:
+        roleTypeId: { type: integer, format: int64, description: id из /api/role-types }
+        title: { type: string, nullable: true, maxLength: 150, description: Если пусто — название типа роли }
+        description: { type: string, nullable: true, maxLength: 2000 }
+        capacity: { type: integer, minimum: 1, maximum: 50 }
+        requirements:
+          type: array
+          items: { $ref: '#/components/schemas/RequirementInput' }
+    UpdateRoleRequest:
+      type: object
+      description: Передаются только изменяемые поля
+      properties:
+        roleTypeId: { type: integer, format: int64 }
+        title: { type: string, maxLength: 150 }
+        description: { type: string, maxLength: 2000 }
+        capacity: { type: integer, minimum: 1, maximum: 50 }
+        requirements:
+          type: array
+          items: { $ref: '#/components/schemas/RequirementInput' }
+    CreateProjectRequest:
+      type: object
+      required: [title, description, type]
+      properties:
+        title: { type: string, minLength: 3, maxLength: 200 }
+        description: { type: string, minLength: 10, maxLength: 5000 }
+        type: { $ref: '#/components/schemas/ProjectType' }
+        externalContactUrl: { type: string, nullable: true, format: uri, example: 'https://t.me/teamfinder_dev' }
+        publish: { type: boolean, default: false }
+        roles:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/RoleInput' }
+    UpdateProjectRequest:
+      type: object
+      description: Передаются только изменяемые поля. Пустая строка в externalContactUrl очищает контакт.
+      properties:
+        title: { type: string, minLength: 3, maxLength: 200 }
+        description: { type: string, minLength: 10, maxLength: 5000 }
+        type: { $ref: '#/components/schemas/ProjectType' }
+        externalContactUrl: { type: string }
+
+    RoleRequirement:
+      type: object
+      required: [skillId, skillName, type]
+      properties:
+        skillId: { type: integer, format: int64 }
+        skillName: { type: string }
+        type: { $ref: '#/components/schemas/RequirementType' }
+        minimumLevel:
+          allOf: [ { $ref: '#/components/schemas/SkillLevel' } ]
+          nullable: true
+    ProjectRole:
+      type: object
+      required: [id, roleTypeId, roleTypeName, title, capacity, occupied, isClosed, requirementsLocked, requirements]
+      properties:
+        id: { type: integer, format: int64 }
+        roleTypeId: { type: integer, format: int64 }
+        roleTypeName: { type: string }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        capacity: { type: integer }
+        occupied: { type: integer, description: Число действующих участников роли }
+        isClosed: { type: boolean }
+        requirementsLocked: { type: boolean, description: true, если на роль уже подавали заявки }
+        requirements:
+          type: array
+          items: { $ref: '#/components/schemas/RoleRequirement' }
+    RoleCard:
+      type: object
+      required: [id, roleTypeId, title, capacity, occupied, isClosed]
+      properties:
+        id: { type: integer, format: int64 }
+        roleTypeId: { type: integer, format: int64 }
+        title: { type: string }
+        capacity: { type: integer }
+        occupied: { type: integer }
+        isClosed: { type: boolean }
+    ProjectCard:
+      type: object
+      required: [id, title, description, type, state, owner, roles]
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        description: { type: string }
+        type: { $ref: '#/components/schemas/ProjectType' }
+        state: { $ref: '#/components/schemas/ProjectState' }
+        owner: { $ref: '#/components/schemas/PersonRef' }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/RoleCard' }
+    MyProjectCard:
+      allOf:
+        - $ref: '#/components/schemas/ProjectCard'
+        - type: object
+          required: [myRelation, pendingApplications]
+          properties:
+            myRelation: { $ref: '#/components/schemas/ProjectRelation' }
+            pendingApplications:
+              type: integer
+              nullable: true
+              description: Сколько заявок ждут решения. Только для владельца, у участника null
+    ProjectCardPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectCard' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+    ProjectDetails:
+      type: object
+      required: [id, title, description, type, state, owner, createdAt, myRelation, myApplications, roles]
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        description: { type: string }
+        type: { $ref: '#/components/schemas/ProjectType' }
+        state: { $ref: '#/components/schemas/ProjectState' }
+        externalContactUrl: { type: string, nullable: true, description: Только для владельца и действующих участников }
+        owner: { $ref: '#/components/schemas/PersonRef' }
+        createdAt: { type: string, format: date-time }
+        myRelation: { $ref: '#/components/schemas/ProjectRelation' }
+        myApplications:
+          type: array
+          items:
+            type: object
+            required: [applicationId, roleId, status]
+            properties:
+              applicationId: { type: integer, format: int64 }
+              roleId: { type: integer, format: int64 }
+              status: { $ref: '#/components/schemas/ApplicationStatus' }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/ProjectRole' }
+
+    MatchItem:
+      type: object
+      required: [skillId, skill, status]
+      properties:
+        skillId: { type: integer, format: int64 }
+        skill: { type: string }
+        minimumLevel:
+          allOf: [ { $ref: '#/components/schemas/SkillLevel' } ]
+          nullable: true
+        userLevel:
+          allOf: [ { $ref: '#/components/schemas/SkillLevel' } ]
+          nullable: true
+        status: { $ref: '#/components/schemas/MatchStatus' }
+    MatchSummary:
+      type: object
+      required: [requiredMatched, requiredTotal, niceToHaveMatched, niceToHaveTotal]
+      properties:
+        requiredMatched: { type: integer }
+        requiredTotal: { type: integer }
+        niceToHaveMatched: { type: integer }
+        niceToHaveTotal: { type: integer }
+    MatchResult:
+      type: object
+      required: [roleId, profileHasSkills, roleTypeMatchesInterest, required, niceToHave, summary]
+      properties:
+        roleId: { type: integer, format: int64 }
+        profileHasSkills: { type: boolean }
+        roleTypeMatchesInterest: { type: boolean }
+        required:
+          type: array
+          items: { $ref: '#/components/schemas/MatchItem' }
+        niceToHave:
+          type: array
+          items: { $ref: '#/components/schemas/MatchItem' }
+        summary: { $ref: '#/components/schemas/MatchSummary' }
+
+    ApplyRequest:
+      type: object
+      properties:
+        message: { type: string, nullable: true, maxLength: 1000 }
+    Application:
+      type: object
+      required: [id, projectId, roleId, status, createdAt]
+      properties:
+        id: { type: integer, format: int64 }
+        projectId: { type: integer, format: int64 }
+        roleId: { type: integer, format: int64 }
+        status: { $ref: '#/components/schemas/ApplicationStatus' }
+        closeReason:
+          allOf: [ { $ref: '#/components/schemas/ApplicationCloseReason' } ]
+          nullable: true
+        message: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: string, format: date-time, nullable: true }
+        membershipId: { type: integer, format: int64, nullable: true }
+    MyApplication:
+      type: object
+      required: [id, project, role, status, createdAt, canWithdraw]
+      properties:
+        id: { type: integer, format: int64 }
+        project:
+          type: object
+          required: [id, title, state]
+          properties:
+            id: { type: integer, format: int64 }
+            title: { type: string }
+            state: { $ref: '#/components/schemas/ProjectState' }
+        role:
+          type: object
+          required: [id, title]
+          properties:
+            id: { type: integer, format: int64 }
+            title: { type: string }
+        status: { $ref: '#/components/schemas/ApplicationStatus' }
+        closeReason:
+          allOf: [ { $ref: '#/components/schemas/ApplicationCloseReason' } ]
+          nullable: true
+        message: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: string, format: date-time, nullable: true }
+        canWithdraw: { type: boolean }
+    Candidate:
+      type: object
+      required: [id, displayName, skills, interestedRoleTypes]
+      properties:
+        id: { type: integer, format: int64 }
+        displayName: { type: string }
+        bio: { type: string, nullable: true }
+        githubUrl: { type: string, nullable: true }
+        skills:
+          type: array
+          items: { $ref: '#/components/schemas/UserSkill' }
+        interestedRoleTypes:
+          type: array
+          items: { $ref: '#/components/schemas/DictionaryItem' }
+    ProjectApplication:
+      type: object
+      required: [id, roleId, roleTitle, status, createdAt, candidate, match]
+      properties:
+        id: { type: integer, format: int64 }
+        roleId: { type: integer, format: int64 }
+        roleTitle: { type: string }
+        status: { $ref: '#/components/schemas/ApplicationStatus' }
+        closeReason:
+          allOf: [ { $ref: '#/components/schemas/ApplicationCloseReason' } ]
+          nullable: true
+        message: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: string, format: date-time, nullable: true }
+        candidate: { $ref: '#/components/schemas/Candidate' }
+        match: { $ref: '#/components/schemas/MatchSummary' }
+
+    TeamMember:
+      type: object
+      required: [membershipId, userId, displayName, roleId, roleTitle, joinedAt]
+      properties:
+        membershipId: { type: integer, format: int64 }
+        userId: { type: integer, format: int64 }
+        displayName: { type: string }
+        roleId: { type: integer, format: int64 }
+        roleTitle: { type: string }
+        joinedAt: { type: string, format: date-time }
+    Team:
+      type: object
+      required: [project, owner, members]
+      properties:
+        project:
+          type: object
+          required: [id, title, type, state]
+          properties:
+            id: { type: integer, format: int64 }
+            title: { type: string }
+            type: { $ref: '#/components/schemas/ProjectType' }
+            state: { $ref: '#/components/schemas/ProjectState' }
+        owner: { $ref: '#/components/schemas/PersonRef' }
+        externalContactUrl: { type: string, nullable: true }
+        members:
+          type: array
+          items: { $ref: '#/components/schemas/TeamMember' }
+
+    TelegramStatus:
+      type: object
+      required: [enabled, linked]
+      properties:
+        enabled: { type: boolean, description: false — бот не настроен на сервере }
+        linked: { type: boolean }
+        botUsername: { type: string, nullable: true }
+        linkedAt: { type: string, format: date-time, nullable: true }
+    TelegramLink:
+      type: object
+      required: [code, url, expiresAt]
+      properties:
+        code: { type: string }
+        url: { type: string, example: 'https://t.me/teamfinder_demo_bot?start=q3Jx9vT2cKpL0aZw' }
+        expiresAt: { type: string, format: date-time }
+
+    Notification:
+      type: object
+      required: [id, type, text, createdAt, isRead]
+      properties:
+        id: { type: integer, format: int64 }
+        type: { $ref: '#/components/schemas/NotificationType' }
+        text: { type: string }
+        projectId: { type: integer, format: int64, nullable: true }
+        createdAt: { type: string, format: date-time }
+        isRead: { type: boolean }
