@@ -1,15 +1,15 @@
-# TeamFinder Backend
+# TeamFinder · Backend
+
+[Организация](https://github.com/TeamFinderProject) · [Документация](https://github.com/TeamFinderProject/teamfinder-docs) · [Frontend](https://github.com/TeamFinderProject/teamfinder-frontend) · [Kanban](https://github.com/orgs/TeamFinderProject/projects/1)
 
 ASP.NET Core Web API на .NET 10, PostgreSQL 16, Entity Framework Core 10.
-Контракт API — [`teamfinder-docs/api-contracts-v1.md`](https://github.com/TeamFinderProject/teamfinder-docs/blob/main/api-contracts-v1.md) и `openapi.yaml`.
+Контракт API — [`teamfinder-docs/api-contracts-v1.md`](https://github.com/TeamFinderProject/teamfinder-docs/blob/develop/api-contracts-v1.md) и `openapi.yaml`.
 
-> **Состояние этой feature-ветки:** backend-части объединяются. Здесь пока нет модулей `Applications/` и `Teams/`, тестового проекта и нового наполнения БД от второго участника. Таблица ниже описывает целевой состав MVP после объединения. До этого полная сборка и запуск всего приложения не подтверждены.
+[![Backend CI](https://github.com/TeamFinderProject/teamfinder-backend/actions/workflows/database-ci.yml/badge.svg?branch=develop)](https://github.com/TeamFinderProject/teamfinder-backend/actions/workflows/database-ci.yml)
 
-Версии `Microsoft.EntityFrameworkCore` и `Microsoft.EntityFrameworkCore.Relational` закреплены на `10.0.12` вместе с `Design`: при более старой версии тестовый проект получает ошибку `CS1705`.
+Основная ветка — `develop`. В ней находятся модули API, миграция и интеграционные тесты. Checkpoint 3 защищён; дальнейшие замечания фиксируются отдельными задачами на [доске проекта](https://github.com/orgs/TeamFinderProject/projects/1).
 
-После добавления второй backend-части нужно создать миграцию и запустить сборку, тесты и Docker на общей ветке.
-
-## Целевой состав MVP (checkpoint 3)
+## Модули MVP
 
 | Модуль | Endpoint'ы | Где в коде |
 |---|---|---|
@@ -38,7 +38,7 @@ src/TeamFinder.Api/
 tests/TeamFinder.Api.Tests/  интеграционные тесты API на настоящем PostgreSQL
 ```
 
-Контроллер только принимает HTTP-запрос, берёт id пользователя из токена и вызывает сервис. Все бизнес-правила — в сервисах. Коды ошибок — в `business-rules.md` и разделе 14 контракта.
+Контроллер только принимает HTTP-запрос, берёт id пользователя из токена и вызывает сервис. Все бизнес-правила — в сервисах. Коды ошибок описаны в [API-контракте](https://github.com/TeamFinderProject/teamfinder-docs/blob/develop/api-contracts-v1.md).
 
 ## Требования
 
@@ -50,19 +50,11 @@ tests/TeamFinder.Api.Tests/  интеграционные тесты API на н
 
 Чтобы просто запустить проект, хватит Docker, см. раздел «Запуск всего проекта в Docker».
 
-## Первый запуск после обновления (один раз)
+## Миграции
 
-После обновления модели данных старые миграции нужно заменить новой сгенерированной миграцией. Это делает участник, отвечающий за БД. В этой ветке пока остаются старые миграции; они не описывают refresh-токены, уведомления и Telegram.
+Начальная миграция уже включена в `src/TeamFinder.Api/Migrations/`. При обычном запуске применяйте существующие миграции. Не запускайте `scripts/recreate-initial-migration.sh` для запуска приложения: скрипт предназначен для пересоздания схемы и удаляет локальную базу.
 
-Следующие команды выполняются после добавления второй backend-части и скрипта `scripts/recreate-initial-migration.sh` в общую ветку:
-
-```bash
-./scripts/recreate-initial-migration.sh
-git add src/TeamFinder.Api/Migrations
-git commit -m "feat: initial migration for schema v2"
-```
-
-Скрипт поднимает PostgreSQL, создаёт миграцию `InitialCreate` и пересоздаёт локальную базу. Без папки `Migrations` CI не пройдёт.
+При изменении модели добавьте новую миграцию и проверьте её в CI.
 
 ## Обычный запуск
 
@@ -89,7 +81,7 @@ dotnet run --project src/TeamFinder.Api
 | `anna@demo.local` | участник команды «TeamFinder» (Frontend) |
 | `maria@demo.local` | владелец хакатона и проекта «Бот для расписания» |
 
-Отключить: `Demo:SeedOnStartup = false` (в Docker — `DEMO_SEED=false` в `.env`). Сценарий показа — `teamfinder-docs/demo-guide.md`.
+Отключить: `Demo:SeedOnStartup = false` (в Docker — `DEMO_SEED=false` в `.env`). Сценарий показа — [demo-guide.md](https://github.com/TeamFinderProject/teamfinder-docs/blob/develop/demo-guide.md).
 
 ## Telegram-бот
 
@@ -160,4 +152,4 @@ sudo docker compose up -d --build
 - **Аутентификация** — `Auth/AuthService.cs`. Refresh token в БД хранится только как SHA-256 хеш. Повторное использование отозванного токена отзывает всю цепочку (защита от кражи), кроме первых 30 секунд после замены — это на случай нескольких вкладок.
 - **Создание проекта с ролями** — `ProjectService.CreateAsync`: проект, роли и требования добавляются в один `SaveChanges`, то есть в одну транзакцию.
 - **Конкурентный доступ** — `Common/ProjectLock.cs`: каждая операция, меняющая заявки, участников или состояние проекта, открывает транзакцию и блокирует строку проекта `SELECT ... FOR UPDATE`. Операции одного проекта идут строго по очереди, поэтому вместимость роли не превышается.
-- **Уведомления** пишутся в таблицу `notifications` в той же транзакции, что и событие (transactional outbox). Фоновая задача `TelegramWorker` отправляет их в Telegram, почта и push подключатся так же в v1.0.
+- **Уведомления** пишутся в таблицу `notifications` в той же транзакции, что и событие (transactional outbox). Фоновая задача `TelegramWorker` отправляет их в Telegram, другие каналы уведомлений можно добавить отдельно после согласования объёма работ.
