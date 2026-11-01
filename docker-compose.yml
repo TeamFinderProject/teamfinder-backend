@@ -15,6 +15,48 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    # Проект должен запускаться на ноутбуке с 8 ГБ памяти: ограничиваем каждый контейнер.
+    mem_limit: 512m
+
+  # Весь проект одной командой: docker compose up -d --build
+  # (teamfinder-frontend должен лежать рядом: ../teamfinder-frontend).
+  # Для разработки обычно достаточно: docker compose up -d postgres + dotnet run + npm run dev.
+  api:
+    build: .
+    container_name: teamfinder-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__TeamFinder: Host=postgres;Port=5432;Database=teamfinder;Username=teamfinder;Password=${POSTGRES_PASSWORD:-teamfinder_local}
+      # Ключ подписи JWT. Значение по умолчанию — только для локального показа, чтобы проект запускался без настройки.
+      # Для любого общего сервера задать свой ключ в .env (JWT_SIGNING_KEY, от 32 символов).
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:-local-demo-only-signing-key-change-me-in-env}
+      # В контейнере без HTTPS cookie с флагом Secure браузер не сохранит. За nginx с HTTPS вернуть true.
+      Jwt__SecureCookie: "false"
+      Database__MigrateOnStartup: "true"
+      # API стоит за nginx: реальный IP пользователя берётся из X-Forwarded-For (нужно для лимита попыток входа).
+      ReverseProxy__TrustPrivateNetworks: "true"
+      # Демо-пользователи и проекты для показа (docs/demo-guide.md). Для «чистой» базы поставьте "false".
+      Demo__SeedOnStartup: ${DEMO_SEED:-true}
+      # Telegram-уведомления: токен от @BotFather и имя бота. Пусто — Telegram выключен.
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
+      Telegram__BotUsername: ${TELEGRAM_BOT_USERNAME:-}
+      Telegram__SiteUrl: http://localhost:8081
+      Cors__AllowedOrigins__0: http://localhost:8081
+    ports:
+      - "8080:8080"
+    mem_limit: 512m
+
+  frontend:
+    build: ../teamfinder-frontend
+    container_name: teamfinder-frontend
+    depends_on:
+      - api
+    ports:
+      - "8081:80"   # http://localhost:8081 — nginx отдаёт SPA и проксирует /api в контейнер api
+    mem_limit: 128m
 
 volumes:
   teamfinder_pgdata:

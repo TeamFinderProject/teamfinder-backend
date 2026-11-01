@@ -2,4 +2,6 @@
 **/obj/
 .git
 .gitignore
+.env
+tests/
 README.md
